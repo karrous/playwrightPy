@@ -25,3 +25,7 @@ class CountryApiClient:
         if not isinstance(payload, list) or not payload or not isinstance(payload[0], dict):
             raise ValueError(f"Unexpected country API response for {country!r}")
         return response, payload[0]
+
+    def close(self) -> None:
+        """Release the underlying HTTP connection pool."""
+        self.session.close()

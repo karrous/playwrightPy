@@ -7,6 +7,6 @@ test-results/
 .env
 .coverage
 htmlcov/
+.ruff_cache/
 .idea/
 .vscode/
-

@@ -1,0 +1,24 @@
+"""Shared fixtures for UI and API tests."""
+
+from collections.abc import Generator
+
+import pytest
+
+from config.settings import Settings, settings
+from utils.country_api import CountryApiClient
+
+
+@pytest.fixture(scope="session")
+def test_settings() -> Settings:
+    return settings
+
+
+@pytest.fixture(scope="session")
+def country_api(test_settings: Settings) -> Generator[CountryApiClient, None, None]:
+    client = CountryApiClient(
+        base_url=test_settings.api_base_url,
+        timeout=test_settings.api_timeout_seconds,
+    )
+    yield client
+    client.close()
+

@@ -7,8 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,18 +24,93 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Create and activate virtual environment
+      - name: Install development dependencies
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          ruff check .
+
+  api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install API dependencies
         shell: bash
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install --with-deps chromium
 
-      - name: Run API and UI tests
+      - name: Run API tests
         shell: bash
         run: |
           source .venv/bin/activate
-          pytest
+          pytest -m api --junitxml=test-results/api-junit.xml
 
+      - name: Upload API test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: test-results/
+          if-no-files-found: ignore
+
+  ui:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install UI dependencies and Chromium
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run UI tests
+        shell: bash
+        env:
+          PYTEST_BASE_URL: https://www.google.com
+        run: |
+          source .venv/bin/activate
+          pytest -m ui --browser chromium \
+            --tracing retain-on-failure \
+            --screenshot only-on-failure \
+            --video retain-on-failure \
+            --junitxml=test-results/ui-junit.xml
+
+      - name: Upload UI test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: test-results/
+          if-no-files-found: ignore

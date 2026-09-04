@@ -9,15 +9,23 @@ from utils.country_api import CountryApiClient
     ("country", "expected_capital"),
     [("Canada", "Ottawa"), ("Japan", "Tokyo")],
 )
-def test_country_api_returns_expected_capital(country: str, expected_capital: str) -> None:
-    response, country_data = CountryApiClient().get_country(country)
+@pytest.mark.api
+@pytest.mark.smoke
+def test_country_api_returns_expected_capital(
+    country_api: CountryApiClient,
+    country: str,
+    expected_capital: str,
+) -> None:
+    response, country_data = country_api.get_country(country)
 
     assert response.status_code == 200
     assert country_data["capital"] == expected_capital
 
 
-def test_country_api_returns_requested_country() -> None:
-    _, country_data = CountryApiClient().get_country("France")
+@pytest.mark.api
+@pytest.mark.regression
+def test_country_api_returns_requested_country(country_api: CountryApiClient) -> None:
+    _, country_data = country_api.get_country("France")
 
     assert country_data["name"] == "France"
     assert country_data["capital"] == "Paris"
