@@ -75,29 +75,49 @@ ruff check .
 
 ## Environment configuration
 
-`pytest.ini` contains a safe default base URL for the Google example. Override it without changing source code:
+Each environment (`local`, `dev`, `qa`, `prod`) is a named profile in
+[`config/settings.py`](config/settings.py) with its own base URL, API base URL,
+and timeout. Select one with `TEST_ENV`; `local` is the default and targets the
+public sample sites so the bundled tests run with no setup.
 
-### Windows PowerShell
+> Replace the `example.com` placeholder hosts in `config/settings.py` with your
+> real Dev / QA / Prod endpoints before running against them.
+
+### Run each environment
+
+Windows PowerShell:
 
 ```powershell
-$env:TEST_ENV = "staging"
-$env:PYTEST_BASE_URL = "https://staging.example.com"
-$env:COUNTRY_API_BASE_URL = "https://api.example.com"
-$env:API_TIMEOUT_SECONDS = "15"
-pytest -m ui
+$env:TEST_ENV = "dev";  pytest
+$env:TEST_ENV = "qa";   pytest
+$env:TEST_ENV = "prod"; pytest -m smoke   # smoke only against production
+Remove-Item Env:TEST_ENV                  # back to the local default
 ```
 
-### macOS/Linux
+macOS/Linux (scoped to the single command):
 
 ```bash
-export TEST_ENV=staging
-export PYTEST_BASE_URL=https://staging.example.com
-export COUNTRY_API_BASE_URL=https://api.example.com
-export API_TIMEOUT_SECONDS=15
+TEST_ENV=dev  pytest
+TEST_ENV=qa   pytest
+TEST_ENV=prod pytest -m smoke
+```
+
+### Per-field overrides
+
+`PYTEST_BASE_URL`, `COUNTRY_API_BASE_URL`, and `API_TIMEOUT_SECONDS` override the
+selected profile's values one field at a time — useful for an ephemeral
+deployment URL without editing source:
+
+```powershell
+$env:TEST_ENV = "qa"
+$env:PYTEST_BASE_URL = "https://pr-1234.qa.example.com"
 pytest -m ui
 ```
 
-See `.env.example` for the supported variables. The project does not load `.env` files automatically, which keeps CI configuration explicit and avoids adding an unnecessary runtime dependency.
+An unknown `TEST_ENV` fails fast (`TEST_ENV must be one of: dev, local, prod, qa`).
+See `.env.example` for the supported variables. The project does not load `.env`
+files automatically, which keeps CI configuration explicit and avoids an
+unnecessary runtime dependency.
 
 The API client is created once per test session and is available through the `country_api` fixture. Replace it with a company-specific service client as the project grows.
 
@@ -112,6 +132,14 @@ GitHub Actions runs on pushes and pull requests targeting `main`. The workflow h
 - UI tests on Chromium
 
 The UI job collects JUnit results, screenshots, videos, and Playwright traces when failures occur. CI remains headless; headed mode is intended for local debugging.
+
+To target a specific environment from a CI job, set `TEST_ENV` (and any
+overrides) in that job's `env:` block, for example:
+
+```yaml
+    env:
+      TEST_ENV: qa
+```
 
 ## Optional AI tooling
 
