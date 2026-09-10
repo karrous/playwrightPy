@@ -1,6 +1,5 @@
 """Client for the public countries.dev API used by the sample tests."""
 
-import os
 from typing import Any
 
 import requests
@@ -9,10 +8,12 @@ import requests
 class CountryApiClient:
     """Small API client that keeps endpoint and timeout details out of tests."""
 
-    def __init__(self, base_url: str | None = None, timeout: float = 10) -> None:
-        self.base_url = (base_url or os.getenv("COUNTRY_API_BASE_URL", "https://countries.dev")).rstrip("/")
+    def __init__(self, base_url: str, timeout: float = 10, locale: str | None = None) -> None:
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
+        if locale:
+            self.session.headers["Accept-Language"] = locale
 
     def get_country(self, country: str) -> tuple[requests.Response, dict[str, Any]]:
         response = self.session.get(

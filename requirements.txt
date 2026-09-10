@@ -1,4 +1,5 @@
 pytest>=8.0,<9
 pytest-playwright>=0.7,<1
+pytest-base-url>=2,<3
 requests>=2.31,<3
 
