@@ -75,31 +75,48 @@ ruff check .
 
 ## Environment configuration
 
-Each environment (`local`, `dev`, `qa`, `prod`) is a named profile in
-[`config/settings.py`](config/settings.py) with its own base URL, API base URL,
-and timeout. Select one with `TEST_ENV`; `local` is the default and targets the
-public sample sites so the bundled tests run with no setup.
+Two independent dimensions, both resolved in
+[`config/settings.py`](config/settings.py):
+
+- **Environment** — `local`, `dev`, `qa`, `prod`. Each is a named profile with its
+  own base URL, API base URL, and timeout. `local` is the default and targets the
+  public sample sites so the bundled tests run with no setup.
+- **Language** — a short code (`en`, `fr`, `de`, `es`, `ja`, …) or a BCP-47 tag
+  (`fr-FR`). Sets the browser locale (`navigator.language`, `Accept-Language`)
+  and the API client's `Accept-Language` header. Default `en`.
 
 > Replace the `example.com` placeholder hosts in `config/settings.py` with your
-> real Dev / QA / Prod endpoints before running against them.
+> real Dev / QA / Prod endpoints, and add rows to `LANGUAGES` for the languages
+> your application supports.
 
-### Run each environment
+### Pick environment and language from the command line
 
-Windows PowerShell:
+Each accepts a CLI option **or** an environment variable (CLI wins):
 
-```powershell
-$env:TEST_ENV = "dev";  pytest
-$env:TEST_ENV = "qa";   pytest
-$env:TEST_ENV = "prod"; pytest -m smoke   # smoke only against production
-Remove-Item Env:TEST_ENV                  # back to the local default
-```
-
-macOS/Linux (scoped to the single command):
+| Dimension | CLI option | Environment variable |
+| --- | --- | --- |
+| Environment | `--env qa` | `TEST_ENV=qa` |
+| Language | `--language fr` | `TEST_LANGUAGE=fr` |
 
 ```bash
-TEST_ENV=dev  pytest
-TEST_ENV=qa   pytest
-TEST_ENV=prod pytest -m smoke
+# QA environment, French browser + API
+pytest --env qa --language fr
+
+pytest --env dev --language de -m ui
+pytest --env prod --language fr-CA -m smoke
+```
+
+Windows PowerShell, the same via environment variables:
+
+```powershell
+$env:TEST_ENV = "qa"; $env:TEST_LANGUAGE = "fr"; pytest
+Remove-Item Env:TEST_ENV, Env:TEST_LANGUAGE          # back to defaults
+```
+
+The run header echoes what was resolved:
+
+```
+environment: qa | locale: fr-FR | base_url: https://qa.example.com | api_base_url: https://api.qa.example.com
 ```
 
 ### Per-field overrides
@@ -114,10 +131,10 @@ $env:PYTEST_BASE_URL = "https://pr-1234.qa.example.com"
 pytest -m ui
 ```
 
-An unknown `TEST_ENV` fails fast (`TEST_ENV must be one of: dev, local, prod, qa`).
-See `.env.example` for the supported variables. The project does not load `.env`
-files automatically, which keeps CI configuration explicit and avoids an
-unnecessary runtime dependency.
+An unknown environment or language fails fast (`TEST_ENV must be one of: dev,
+local, prod, qa`). See `.env.example` for the supported variables. The project
+does not load `.env` files automatically, which keeps CI configuration explicit
+and avoids an unnecessary runtime dependency.
 
 The API client is created once per test session and is available through the `country_api` fixture. Replace it with a company-specific service client as the project grows.
 
@@ -133,12 +150,13 @@ GitHub Actions runs on pushes and pull requests targeting `main`. The workflow h
 
 The UI job collects JUnit results, screenshots, videos, and Playwright traces when failures occur. CI remains headless; headed mode is intended for local debugging.
 
-To target a specific environment from a CI job, set `TEST_ENV` (and any
-overrides) in that job's `env:` block, for example:
+To target a specific environment and language from a CI job, set the variables
+in that job's `env:` block, for example:
 
 ```yaml
     env:
       TEST_ENV: qa
+      TEST_LANGUAGE: fr
 ```
 
 ## Optional AI tooling
