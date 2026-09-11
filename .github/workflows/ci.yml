@@ -6,13 +6,32 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [local, dev, qa, prod]
+        default: local
+      language:
+        description: Language (short code or BCP-47 tag, e.g. fr / fr-FR)
+        type: string
+        default: en
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TEST_ENV: ${{ inputs.environment || 'local' }}
+  TEST_LANGUAGE: ${{ inputs.language || 'en' }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -24,57 +43,48 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install development dependencies
-        shell: bash
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+      - name: Install Ruff
+        run: pip install ruff
 
       - name: Run Ruff
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          ruff check .
+        run: ruff check --output-format=github .
 
   api:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install API dependencies
-        shell: bash
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run API tests
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          pytest -m api --junitxml=test-results/api-junit.xml
+        run: pytest -m api --junitxml=test-results/api-junit.xml
 
       - name: Upload API test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-results
+          name: api-test-results-py${{ matrix.python-version }}
           path: test-results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
   ui:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -86,26 +96,33 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install UI dependencies and Chromium
-        shell: bash
+      - name: Install UI dependencies
+        run: pip install -r requirements.txt
+
+      - name: Resolve Playwright version
+        id: pw
         run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import importlib.metadata as m
+          print("version=" + m.version("playwright"))
+          PY
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
 
       - name: Run UI tests
-        shell: bash
-        env:
-          PYTEST_BASE_URL: https://www.google.com
-        run: |
-          source .venv/bin/activate
-          pytest -m ui --browser chromium \
-            --tracing retain-on-failure \
-            --screenshot only-on-failure \
-            --video retain-on-failure \
-            --junitxml=test-results/ui-junit.xml
+        run: >
+          pytest -m ui --browser chromium
+          --tracing retain-on-failure
+          --screenshot only-on-failure
+          --video retain-on-failure
+          --junitxml=test-results/ui-junit.xml
 
       - name: Upload UI test artifacts
         if: always()
@@ -113,4 +130,4 @@ jobs:
         with:
           name: ui-test-results
           path: test-results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
