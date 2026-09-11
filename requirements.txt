@@ -1,5 +1,6 @@
 pytest>=8.0,<9
 pytest-playwright>=0.7,<1
 pytest-base-url>=2,<3
+pytest-rerunfailures>=14,<17
 requests>=2.31,<3
 
